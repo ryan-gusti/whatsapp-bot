@@ -2,6 +2,9 @@ require("dotenv").config();
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const { Configuration, OpenAIApi } = require("openai");
 const translate = require("translate-google");
+const { config, createAudioFromText } = require("tiktok-tts");
+config(process.env.TT_TOKEN);
+const { TiktokDL } = require("@tobyg74/tiktok-api-dl");
 const googleTTS = require("google-tts-api");
 const qrcode = require("qrcode-terminal");
 // clien config
@@ -25,6 +28,15 @@ async function runCompletion(message) {
     ],
   });
   return completion.data.choices[0].message.content;
+}
+
+async function ttsTiktok(message) {
+  await createAudioFromText(message, "audio", "id_001");
+}
+
+async function ttdl(url) {
+  const result = await TiktokDL(url);
+  return result.result.video[1];
 }
 
 client.on("loading_screen", (percent, message) => {
@@ -52,7 +64,7 @@ client.initialize();
 client.on("message", async (msg) => {
   // info command
   if (msg.body === "!info") {
-    const message = `🤖---BOT COMMAND---🤖\n1. *!everyone* = to mention everyone in group.\n2. *!sticker* = to create sticker from image/video.\n3. *!gpt* _prompt_ = communicate with chatgpt.\n4. *!trans* *#lang* _text_ = to using translate ex : !trans #id i want to eat.\n5. *!tts* _text_ = to using text to speech.\n\n follow ig @digiding.id`;
+    const message = `🤖---BOT COMMAND---🤖\n1. *!everyone* = to mention everyone in group.\n2. *!sticker* = to create sticker from image/video.\n3. *!gpt* _prompt_ = communicate with chatgpt.\n4. *!trans* *#lang* _text_ = to using translate ex : !trans #id i want to eat.\n5. *!ttsgg* _text_ = to using text to speech from google voice.\n6. *!ttstt* _text_ = to using text to speech from tiktok voice\n7. *!tiktok* _url_ = to download tiktok video\n\n follow ig @digiding.id`;
     const media = await MessageMedia.fromUrl(process.env.URL_LOGO);
     client.sendMessage(msg.from, message, { media: media });
   }
@@ -89,17 +101,30 @@ client.on("message", async (msg) => {
         console.error(err);
       });
   }
-  // text to speech
-  if (msg.body.slice(0, 4) === "!tts") {
-    const message = msg.body.slice(5);
+  // text to speech google
+  if (msg.body.slice(0, 6) === "!ttsgg") {
+    const message = msg.body.slice(7);
     const url = googleTTS.getAudioUrl(message, {
       lang: "id",
       slow: false,
       host: "https://translate.google.com",
     });
-
     const media = await MessageMedia.fromUrl(url, { unsafeMime: true });
     client.sendMessage(msg.from, media);
+  }
+  // text to speech tiktok
+  if (msg.body.slice(0, 6) === "!ttstt") {
+    const message = msg.body.slice(7);
+    await ttsTiktok(message);
+    const media = MessageMedia.fromFilePath("./audio.mp3");
+    client.sendMessage(msg.from, media);
+  }
+  // tiktok downloader
+  if (msg.body.slice(0, 7) === "!tiktok") {
+    const tiktok_url = msg.body.slice(8);
+    const result = await ttdl(tiktok_url);
+    const media = await MessageMedia.fromUrl(result, { unsafeMime: true });
+    client.sendMessage(msg.from, media, { caption: "Download Success ✅" });
   }
   // chatgpt
   if (msg.body.slice(0, 4) === "!gpt") {
